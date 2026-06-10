@@ -59,10 +59,11 @@ class HafasImporter(
                 val lineName = dep.name.trim()
                 if (lineName.isBlank()) continue
                 if (lineName !in journeyByLine && dep.journeyDetailRef?.ref?.isNotEmpty() == true) {
+                    val prod = dep.product?.firstOrNull()
                     journeyByLine[lineName] = LineInfo(
                         name     = lineName,
-                        type     = toLineType(dep.product?.catOut ?: ""),
-                        operator = dep.product?.operator ?: dep.product?.operatorCode ?: "",
+                        type     = toLineType(prod?.catOut ?: ""),
+                        operator = prod?.operator ?: prod?.operatorCode ?: "",
                         ref      = dep.journeyDetailRef.ref
                     )
                 }

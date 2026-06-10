@@ -86,4 +86,6 @@ data class JourneyName(
 data class HafasStop(
     val extId: String = "",
     val name: String = "",
-    val lon:
+    val lon: Double = 0.0,
+    val lat: Double = 0.0
+)
