@@ -1,16 +1,16 @@
 import './style.css'
-import { TrackMap } from './renderer'
+import {MapRenderer} from "./map/MapRenderer.ts";
 
 const canvas  = document.querySelector<HTMLCanvasElement>('#map')!
-const loading = document.querySelector<HTMLDivElement>('#loading')!
+// const loading = document.querySelector<HTMLDivElement>('#loading')!
 
-const map = new TrackMap(canvas)
+new MapRenderer(canvas)
 
-map.load()
-  .then(() => {
-    loading.style.display = 'none'
-  })
-  .catch((err: Error) => {
-    loading.textContent = `Fehler beim Laden: ${err.message}`
-    console.error(err)
-  })
+// map.load()
+//   .then(() => {
+//     loading.style.display = 'none'
+//   })
+//   .catch((err: Error) => {
+//     loading.textContent = `Fehler beim Laden: ${err.message}`
+//     console.error(err)
+//   })
