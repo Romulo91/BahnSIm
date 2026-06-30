@@ -31,3 +31,20 @@ html, body {
   letter-spacing: 0.1em;
   pointer-events: none;
 }
+
+#zoom-control-container {
+ position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  z-index: 10;
+  button {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    font-size: 1.4rem;
+    cursor: pointer;
+  }
+}

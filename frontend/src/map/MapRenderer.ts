@@ -7,8 +7,8 @@ import { makeProjection } from './projection.ts'
 export class MapRenderer {
   private readonly canvas: HTMLCanvasElement
   private readonly ctx: CanvasRenderingContext2D
-  // Alle geladenen Tracks – leer bis load() abgeschlossen ist.
   private tracks: Track[]
+  // private zoomLevel: number
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas
@@ -16,6 +16,7 @@ export class MapRenderer {
     // Das "!" sagt TypeScript: "Ich bin sicher, dass es nicht null ist."
     this.ctx = canvas.getContext('2d')!
     this.tracks = []
+    // this.zoomLevel = browser.tabs.getZoom();
 
     // Canvas-Auflösung auf Fenstergröße setzen, bevor irgendetwas gezeichnet wird.
     // Ohne dies hat das Canvas intern nur 300 × 150 px (Browser-Standard),
@@ -48,7 +49,6 @@ export class MapRenderer {
     try {
       this.tracks = await fetchTracks()
       console.log(`${this.tracks.length} Tracks geladen`)
-
       // Leeres Array bedeutet: Backend läuft, aber keine Daten vorhanden.
       // Kein Fehler, aber auch kein sinnvolles Render möglich.
       if (this.tracks.length === 0) {
