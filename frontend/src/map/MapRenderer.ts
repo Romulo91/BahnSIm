@@ -158,57 +158,77 @@ export class MapRenderer {
     return { minLat, maxLat, minLon, maxLon }
   }
 
+  // Zeichnet den Pfad eines einzelnen Tracks auf den Canvas.
+  // Wird von render() in beiden Passes (Casing + Linie) aufgerufen.
+  private drawTrack(track: Track, project: (lat: number, lon: number) => { x: number; y: number }): void {
+    this.ctx.beginPath()
+    const first = project(track.points[0].lat, track.points[0].lon)
+    this.ctx.moveTo(first.x, first.y)
+    for (let i = 1; i < track.points.length; i++) {
+      const { x, y } = project(track.points[i].lat, track.points[i].lon)
+      this.ctx.lineTo(x, y)
+    }
+    this.ctx.stroke()
+  }
+
   render(): void {
     const { width, height } = this.canvas
     if (!this.bbox) return
 
     // Hintergrund füllen – überschreibt das vorherige Frame vollständig.
-    // Ohne fillRect würde beim Resize das alte Bild unter dem neuen durchscheinen.
     this.ctx.fillStyle = '#ffffff'
     this.ctx.fillRect(0, 0, width, height)
 
-    // Projektionsfunktion einmal erstellen – alle Konstanten (scale, offsets, lonScale)
-    // werden hier fixiert. Pro Punkt braucht project() dann nur noch 4 Operationen.
     const project = makeProjection(this.bbox, width, height, 40)
 
-    // Canvas-Transform anwenden: erst verschieben (pan), dann skalieren (zoom).
-    // Alle Zeichenoperationen darunter arbeiten im transformierten Koordinatensystem –
-    // makeProjection bleibt unverändert, der Transform übernimmt den Zoom.
     this.ctx.save()
     this.ctx.translate(this.panX, this.panY)
     this.ctx.scale(this.zoom, this.zoom)
 
-    for (const track of this.tracks) {
-      // Tracks mit weniger als 2 Punkten können keine Linie bilden → überspringen.
-      if (track.points.length < 2) continue
+    // Linienbreiten und Zeichenreihenfolge pro Typ.
+    // Subway zuerst (unterste Schicht), Tram zuletzt (oberste Schicht).
+    // So liegt eine schmalere Tram-Linie immer sichtbar über einer breiteren U-Bahn.
+    const TYPE_STYLE: Record<string, { order: number; caseW: number; lineW: number }> = {
+      subway:     { order: 0, caseW: 4.5, lineW: 3.0 },
+      light_rail: { order: 1, caseW: 4.0, lineW: 2.5 },
+      tram:       { order: 2, caseW: 3.0, lineW: 1.8 },
+    }
+    const DEFAULT_STYLE = { order: 3, caseW: 2.5, lineW: 1.5 }
 
-      // Farbe aus OSM-Daten oder Typ-Fallback (siehe colors.ts).
-      this.ctx.strokeStyle = trackColor(track)
-      // lineWidth durch zoom teilen, damit Linien beim Reinzoomen nicht dicker werden.
-      this.ctx.lineWidth = 1.8 / this.zoom
+    const sorted = [...this.tracks]
+      .filter(t => t.points.length >= 2)
+      .sort((a, b) => {
+        const oa = (TYPE_STYLE[a.lineType] ?? DEFAULT_STYLE).order
+        const ob = (TYPE_STYLE[b.lineType] ?? DEFAULT_STYLE).order
+        return oa - ob
+      })
 
-      // beginPath() startet einen neuen Pfad. Ohne es würden alle Tracks
-      // zu einem einzigen Pfad verbunden – stroke() würde sie falsch verbinden.
-      this.ctx.beginPath()
-
-      // Ersten Punkt als Startposition setzen (kein Strich, nur "Stift anheben").
-      const first = project(track.points[0].lat, track.points[0].lon)
-      this.ctx.moveTo(first.x, first.y)
-
-      // Alle weiteren Punkte als Linien anfügen.
-      // project() rechnet GPS → Pixel: (lat, lon) → { x, y }
-      for (let i = 1; i < track.points.length; i++) {
-        const { x, y } = project(track.points[i].lat, track.points[i].lon)
-        this.ctx.lineTo(x, y)
-      }
-
-      // Den gesamten Pfad dieses Tracks auf den Canvas zeichnen.
-      // stroke() zeichnet immer den kompletten Pfad seit dem letzten beginPath().
-      this.ctx.stroke()
+    // ── Pass 1: Casing (weißer Rand) ──────────────────────────────────────────
+    // Alle Tracks mit einer dickeren weißen Linie zeichnen.
+    // Wo zwei farbige Linien übereinanderliegen, entsteht durch das Casing
+    // ein sichtbarer weißer Spalt zwischen ihnen – wie auf echten Fahrplänen.
+    this.ctx.strokeStyle = '#ffffff'
+    this.ctx.lineJoin = 'round'
+    this.ctx.lineCap  = 'round'
+    for (const track of sorted) {
+      const style = TYPE_STYLE[track.lineType] ?? DEFAULT_STYLE
+      this.ctx.lineWidth = style.caseW / this.zoom
+      this.drawTrack(track, project)
     }
 
-    // Transform zurücksetzen – wichtig damit renderError() nicht
-    // versehentlich im transformierten Koordinatensystem zeichnet.
+    // ── Pass 2: Farbige Linie ──────────────────────────────────────────────────
+    // Danach alle Tracks mit ihrer eigentlichen Farbe und schmalerer Breite.
+    // Da Pass 1 alle Casings bereits gezeichnet hat, schneidet das weiße Casing
+    // auch durch Linien, die in Pass 2 noch nicht gezeichnet wurden – korrekt.
+    for (const track of sorted) {
+      const style = TYPE_STYLE[track.lineType] ?? DEFAULT_STYLE
+      this.ctx.strokeStyle = trackColor(track)
+      this.ctx.lineWidth   = style.lineW / this.zoom
+      this.ctx.lineJoin    = 'round'
+      this.ctx.lineCap     = 'round'
+      this.drawTrack(track, project)
+    }
+
     this.ctx.restore()
   }
 }
